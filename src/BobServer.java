@@ -110,11 +110,13 @@ public class BobServer {
                     break;
                 }
 
-                if ("q".equals(msg)){
-                    break;
-                }
+                String decrypted = AES.decrypt(msg);
+                String sha256 = SHA.hash256(decrypted);
                 System.out.println("Encoded message: " + msg);
-                System.out.println( "Decoded message: " + AES.decrypt(msg));
+                System.out.println( "Decoded message: " + decrypted);
+                System.out.println("SHA256 hash: " + sha256);
+
+                dos.writeUTF(sha256);
             }
 
 

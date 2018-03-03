@@ -109,8 +109,17 @@ public class AliceClient {
                 break;
             }
             String encodedMsg = AES.encrypt(userInput);
+            String sha256 = SHA.hash256(userInput);
             System.out.println("Encoded: " + encodedMsg);
-            dos.writeUTF(AES.encrypt(userInput));
+            System.out.println("SHA256: " + sha256);
+            dos.writeUTF(encodedMsg);
+
+            String receivedSha256 = dis.readUTF();
+            if (receivedSha256.equals(sha256)){
+                System.out.println("Message was not changed");
+            }else {
+                System.out.println("Message was changed");
+            }
         }
 
 
