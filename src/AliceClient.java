@@ -1,10 +1,11 @@
 import javax.crypto.KeyAgreement;
 import java.io.*;
+import java.math.BigInteger;
 import java.net.Socket;
 import java.security.*;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.X509EncodedKeySpec;
-import java.util.Arrays;
+import java.util.*;
 
 public class AliceClient {
 
@@ -134,11 +135,90 @@ public class AliceClient {
         dis = new DataInputStream(socketInputStream);
 
 
-        // Setup secret key.
+        /////////////////////// Key agreement ///////////////////////
         agreeAboutKey();
 
-        // Start communication/.
-        communicate();
+        /////////////////////// Authorization ///////////////////////
+
+        BigInteger trustedN = new BigInteger(dis.readUTF());    // Receive n = p*q
+        int k = dis.readInt();  // Receive k
+        int t = dis.readInt();  // Receive amount of rounds t
+        System.out.println("Alice n:" +  trustedN);
+        System.out.println("Alice k:" +  k);
+
+        List<BigInteger> randomInts = new ArrayList<>();    // s1,s2...sk
+        BitSet randomBits = new BitSet(k);  // b1,b2...bk
+        List<BigInteger> listV = new ArrayList<>(); // v1,v2...vk
+
+        Random rand = new Random(); // Need for generation random ints
+
+        /*
+        Choose k positive numbers less than trustedN.
+        Choose k bits 0 or 1
+         */
+        System.out.print("Serets: ");
+        for (int i = 0; i < k; i++) {
+            randomInts.add(BigInteger.valueOf((rand.nextInt(Integer.MAX_VALUE) + 1)).mod(trustedN));
+            randomBits.set(i, rand.nextBoolean());
+
+            BigInteger minus1pow = (((new BigInteger("-1")).pow(randomBits.get(i) ? 1 : 0)).mod(trustedN));
+            BigInteger randomIntPow = (randomInts.get(i).pow(2)).modInverse(trustedN);
+            System.out.print(randomInts.get(i) + " " + randomBits.get(i) + " ");
+            listV.add((minus1pow.multiply(randomIntPow)).mod(trustedN));
+        }
+
+        System.out.println("\nAlice vi: ");
+        for (BigInteger bi:
+             listV) {
+            System.out.println(bi.toString());
+            dos.writeUTF(bi.toString());
+        }
+
+
+        ///////////////// Rounds ////////////////////////////
+
+        /*
+        Count x value like x = (-1)^b * r^2
+         */
+        BigInteger randomR = BigInteger.valueOf((rand.nextInt(Integer.MAX_VALUE) + 1)).mod(trustedN);   // Randomly selected r
+        int bitIndex = rand.nextInt(randomBits.length());   // Randomly selected bitIndex
+
+        System.out.println("Alice r: " + randomR.toString());
+        System.out.println("Alice bitIbdex: " + bitIndex);
+
+        BigInteger minus1powMod = (((new BigInteger("-1")).pow(randomBits.get(bitIndex) ? 1 : 0)).mod(trustedN));   // (-1)^b mod n
+        BigInteger randomRpow2Mod = (randomR.pow(2)).mod(trustedN); // r^2 mod n
+
+//        BigInteger x = (minus1powMod.multiply(randomRpow2Mod)).mod(trustedN); // x value
+        BigInteger x = ((new BigInteger("-1")).pow(randomBits.get(bitIndex) ? 1 : 0).mod(trustedN)).multiply((randomR.pow(2)).mod(trustedN)).mod(trustedN);
+
+        System.out.println("Alice x: " + x.toString());
+
+        dos.writeUTF(x.toString());
+
+        String eBits = dis.readUTF();
+
+        System.out.println("Alice eBits: " + eBits);
+
+
+        BigInteger totalMult = new BigInteger("1");
+
+        for (int i = 0; i < k; i++) {
+            totalMult = totalMult
+                    .multiply(randomInts.get(i).pow(eBits.charAt(i) == '1' ? 1 : 0));
+        }
+        totalMult = totalMult.mod(trustedN).multiply(randomR.mod(trustedN)).mod(trustedN);
+        BigInteger y = totalMult;
+//        BigInteger y = (randomR.mod(trustedN).multiply(totalMult.mod(trustedN))).mod(trustedN);   // Count y(step 3 in algorithm)
+
+
+        dos.writeUTF(y.toString()); // Send y
+        System.out.println("Alice y: " + y.toString());
+
+
+
+        /////////////////////// Communication ///////////////////////
+//        communicate();
 
 
 
