@@ -6,7 +6,7 @@ import java.security.spec.InvalidKeySpecException;
 
 public class Main {
 
-    public static void main(String[] args) throws InvalidKeySpecException, InvalidAlgorithmParameterException, NoSuchAlgorithmException, InvalidKeyException, IOException {
+    public static void main(String[] args) throws Exception {
         assert args.length == 1;
 
         if (args[0].equals("-s")){

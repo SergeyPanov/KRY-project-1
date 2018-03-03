@@ -4,6 +4,7 @@ import java.net.Socket;
 import java.security.*;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.X509EncodedKeySpec;
+import java.util.Arrays;
 
 public class AliceClient {
 
@@ -11,7 +12,7 @@ public class AliceClient {
     private String host;
     private int keySize = 512;
 
-    public void startCommunication() throws IOException, NoSuchAlgorithmException, InvalidKeySpecException, InvalidKeyException {
+    public void startCommunication() throws Exception {
 
         // Create socket for communication
         Socket socket = null;
@@ -93,6 +94,24 @@ public class AliceClient {
 
         System.out.println("Alice secret: " +
                 HexPrinter.toHexString(aliceSharedSecret));
+
+
+        /////////////////////// Communication phase ///////////////////////
+
+        AES.setKeyValue(Arrays.copyOfRange(aliceSharedSecret, 0, 32));
+
+        BufferedReader stdIn = new BufferedReader(new InputStreamReader(System.in));
+
+        while (true){
+            System.out.print("client: ");
+            String userInput = stdIn.readLine();
+            if ("q".equals(userInput)){
+                break;
+            }
+            String encodedMsg = AES.encrypt(userInput);
+            System.out.println("Encoded: " + encodedMsg);
+            dos.writeUTF(AES.encrypt(userInput));
+        }
 
 
         dis.close();
