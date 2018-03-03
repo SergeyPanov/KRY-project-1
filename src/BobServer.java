@@ -15,7 +15,6 @@ public class BobServer {
     private int port;
 
 
-
     public void startCommunicate() throws Exception {
 
         while (true){

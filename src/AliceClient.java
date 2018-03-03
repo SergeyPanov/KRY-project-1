@@ -11,23 +11,17 @@ public class AliceClient {
     private int port = 4444;
     private String host;
     private int keySize = 512;
+    private Socket socket = null;
+    private OutputStream socketOutputStream = null;
+    private InputStream socketInputStream = null;
+    private DataOutputStream dos = null;
+    private DataInputStream dis = null;
+    byte[] aliceSharedSecret;
 
-    public void startCommunication() throws Exception {
-
-        // Create socket for communication
-        Socket socket = null;
-        socket = new Socket(host, port);
-
-        // Create input and output streams
-        OutputStream socketOutputStream = socket.getOutputStream();
-        InputStream socketInputStream = socket.getInputStream();
-
-        // Create data input and data output streams; just for convenience
-        DataOutputStream dos = new DataOutputStream(socketOutputStream);
-        DataInputStream dis = new DataInputStream(socketInputStream);
+    private void agreeAboutKey() throws IOException, NoSuchAlgorithmException, InvalidKeySpecException, InvalidKeyException {
 
         /*
-         * Alice creates her own DH key pair with 512-bit key size
+         * Alice creates her own DH key pair with keySize key size
          */
         System.out.println("ALICE: Generate DH keypair ...");
         KeyPairGenerator aliceKpairGen = null;
@@ -88,16 +82,14 @@ public class AliceClient {
          * agreement protocol.
          * Both generate the (same) shared secret.
          */
-        byte[] aliceSharedSecret;
         aliceSharedSecret = aliceKeyAgree.generateSecret();
-
 
         System.out.println("Alice secret: " +
                 HexPrinter.toHexString(aliceSharedSecret));
+    }
 
 
-        /////////////////////// Communication phase ///////////////////////
-
+    private void communicate() throws Exception {
         AES.setKeyValue(Arrays.copyOfRange(aliceSharedSecret, 0, 32));
 
         BufferedReader stdIn = new BufferedReader(new InputStreamReader(System.in));
@@ -122,7 +114,35 @@ public class AliceClient {
             }
         }
 
+    }
 
+    public void startCommunication() throws Exception {
+
+        /*
+        Setup connection with server.
+         */
+
+        // Create socket for communication.
+        socket = new Socket(host, port);
+
+        // Create input and output streams.
+        socketOutputStream = socket.getOutputStream();
+        socketInputStream = socket.getInputStream();
+
+        // Create data input and data output streams; just for convenience.
+        dos = new DataOutputStream(socketOutputStream);
+        dis = new DataInputStream(socketInputStream);
+
+
+        // Setup secret key.
+        agreeAboutKey();
+
+        // Start communication/.
+        communicate();
+
+
+
+        // Close opened streams.
         dis.close();
         dos.close();
         socketOutputStream.close();
