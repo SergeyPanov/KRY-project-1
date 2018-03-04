@@ -102,18 +102,18 @@ public class BobServer {
 
             TrustedCenter tc = new TrustedCenter();
 
-            BigInteger trustedN = tc.generateN();
 
+
+            BigInteger trustedN = tc.generateN();
             System.out.println("Bob n:" +  trustedN);
             dos.writeUTF(trustedN.toString());  // Send n = p*q
             dos.writeInt(tc.getK());    // Send k
-            dos.writeInt(tc.getT());    // Send amount of rounds t
+            dos.writeInt(TrustedCenter.t);    // Send amount of rounds t
 
 
-            List<BigInteger> randomInts = new ArrayList<>();    // s1,s2...sk
-            BitSet randomBits = new BitSet(tc.getK());  // b1,b2...bk
             List<BigInteger> listV = new ArrayList<>(); // v1,v2...vk
 
+            // Receive vi vector from Alice
             for (int i = 0; i < tc.getK(); ++i){
                 String v;
                 try{
@@ -127,68 +127,77 @@ public class BobServer {
 
             Random rand = new Random(); // Need for generation random ints
 
-//            for (int i = 0; i < tc.getK(); i++) {
-//                randomInts.add(BigInteger.valueOf((rand.nextInt(Integer.MAX_VALUE) + 1)).mod(trustedN));
-//                randomBits.set(i, rand.nextBoolean());
-//
-//                BigInteger minus1pow = (((new BigInteger("-1")).pow(randomBits.get(i) ? 1 : 0)).mod(trustedN));
-//                BigInteger randomIntPow = (randomInts.get(i).pow(2)).modInverse(trustedN);
-//
-//                listV.add((minus1pow.multiply(randomIntPow)).mod(trustedN));
-//            }
 
             ///////////////// Rounds ////////////////////////////
+            boolean wasIdentified = true;
 
-            BigInteger x = new BigInteger(dis.readUTF());   // Received x value
+            for (int j = 0; j < TrustedCenter.t ; j++) {
+                BigInteger x = new BigInteger(dis.readUTF());   // Received x value
 
-            System.out.println("Bob x: " + x.toString());
+                System.out.println("Bob x: " + x.toString());
 
-            StringBuilder eBits = new StringBuilder();   // Bit vector (e1, e2...ek)
-            for (int i = 0; i < tc.getK(); i++) {
-                eBits.append(rand.nextBoolean() ? "1" : "0");
+                StringBuilder eBits = new StringBuilder();   // Bit vector (e1, e2...ek)
+                for (int i = 0; i < tc.getK(); i++) {
+                    eBits.append(rand.nextBoolean() ? "1" : "0");
+                }
+
+                System.out.println("Bob eBits: " + eBits.toString());
+                dos.writeUTF(eBits.toString()); // Send vector (e1,e2...ek) as string
+
+                BigInteger y = new BigInteger(dis.readUTF());   // Receive y
+
+                System.out.println("Bob y: " + y.toString());
+
+                BigInteger totalMultV = new BigInteger("1");
+
+                for (int i = 0; i < tc.getK(); i++) {
+                    totalMultV = totalMultV
+                            .multiply(listV.get(i).pow(eBits.charAt(i) == '1' ? 1 : 0));
+                }
+
+                System.out.println("total mult v: " + totalMultV);
+
+                BigInteger z = ((y.pow(2)).multiply(totalMultV)).mod(trustedN);
+                System.out.println("Bob z: " + z.toString());
+
+                if ((z.toString().equals(x.toString()) || z.toString().equals(x.negate().mod(trustedN).toString()))
+                        && !z.toString().equals("0")){
+                    System.out.println("SUCCESS");
+                }
+                else {
+
+                    wasIdentified = false;
+                    System.out.println("FAIL");
+
+                    System.out.println("x: " + x.toString());
+                    System.out.println("z: " + z.toString());
+                }
             }
-
-            System.out.println("Bob eBits: " + eBits.toString());
-            dos.writeUTF(eBits.toString()); // Send vector (e1,e2...ek) as string
-
-            BigInteger y = new BigInteger(dis.readUTF());   // Receive y
-
-            System.out.println("Bob y: " + y.toString());
-
-            BigInteger totalMultV = new BigInteger("1");
-
-            for (int i = 0; i < tc.getK(); i++) {
-                totalMultV = totalMultV
-                        .multiply(listV.get(i).pow(eBits.charAt(i) == '1' ? 1 : 0));
-            }
-
-            totalMultV = totalMultV.mod(trustedN);
-            BigInteger z = (y.pow(2).mod(trustedN)).multiply(totalMultV).mod(trustedN);
-
-            System.out.println("Bob z: " + z.toString());
 
 
             /////////////////////// Communication ///////////////////////
 
-//            AES.setKeyValue(Arrays.copyOfRange(bobSharedSecret, 0, 32));
-//
-//            while (true){
-//                String msg;
-//                try{
-//                    msg = dis.readUTF();
-//                }catch (EOFException e){
-//                    break;
-//                }
-//
-//                String decrypted = AES.decrypt(msg);
-//                String sha256 = SHA.hash256(decrypted);
-//                System.out.println("Encoded message: " + msg);
-//                System.out.println( "Decoded message: " + decrypted);
-//                System.out.println("SHA256 hash: " + sha256);
-//
-//                dos.writeUTF(sha256);
-//            }
+            if (wasIdentified){
+                AES.setKeyValue(Arrays.copyOfRange(bobSharedSecret, 0, 32));
 
+                while (true){
+                    String msg;
+                    try{
+                        msg = dis.readUTF();
+                    }catch (EOFException e){
+                        break;
+                    }
+
+                    String decrypted = AES.decrypt(msg);
+                    String sha256 = SHA.hash256(decrypted);
+                    System.out.println("Encoded message: " + msg);
+                    System.out.println( "Decoded message: " + decrypted);
+                    System.out.println("SHA256 hash: " + sha256);
+
+                    dos.writeUTF(sha256);
+                }
+
+            }
             //////////////////////////////////////////////////////////////////
             dos.close();
             dis.close();

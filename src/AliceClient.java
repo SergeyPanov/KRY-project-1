@@ -18,7 +18,14 @@ public class AliceClient {
     private DataOutputStream dos = null;
     private DataInputStream dis = null;
     byte[] aliceSharedSecret;
+    private BigInteger trustedN;
+    private int k;
+    private int t;
 
+    List<BigInteger> randomInts = new ArrayList<>();    // s1,s2...sk
+    BitSet randomBits;  // b1,b2...bk
+    List<BigInteger> listV = new ArrayList<>(); // v1,v2...vk
+    Random rand = new Random(); // Need for generation random ints
     private void agreeAboutKey() throws IOException, NoSuchAlgorithmException, InvalidKeySpecException, InvalidKeyException {
 
         /*
@@ -117,6 +124,89 @@ public class AliceClient {
 
     }
 
+    private void identifyMyself() throws IOException {
+        trustedN = new BigInteger(dis.readUTF());    // Receive n = p*q
+        k = dis.readInt();  // Receive k
+        t = dis.readInt();  // Receive amount of rounds t
+        System.out.println("Alice n:" +  trustedN);
+        System.out.println("Alice k:" +  k);
+
+        randomInts = new ArrayList<>();    // s1,s2...sk
+        randomBits = new BitSet(k);  // b1,b2...bk
+        listV = new ArrayList<>(); // v1,v2...vk
+
+        /*
+        Choose k positive numbers less than trustedN.
+        Choose k bits 0 or 1
+         */
+        System.out.print("Serets: ");
+        for (int i = 0; i < k; i++) {
+            BigInteger si = new BigInteger(trustedN.bitLength() + 1, rand).mod(trustedN);
+
+            while (si.gcd(trustedN).intValue() != 1){
+                si = new BigInteger(trustedN.bitLength() + 1, rand).mod(trustedN);
+            }
+            randomInts.add(si);
+            randomBits.set(i, rand.nextBoolean());
+
+            BigInteger minus1pow = (((new BigInteger("-1")).pow(randomBits.get(i) ? 1 : 0)));
+            BigInteger vi = minus1pow.multiply(randomInts.get(i).pow(2)).modInverse(trustedN);
+
+            listV.add(vi);
+        }
+
+        System.out.println("\nAlice vi: ");
+        // Send public vi vector
+        for (BigInteger bi:
+                listV) {
+            System.out.println(bi.toString());
+            dos.writeUTF(bi.toString());
+        }
+
+    }
+
+    private void playRounds() throws IOException {
+        for (int j = 0; j < t; j++) {
+
+                    /*
+        Count x value like x = (-1)^b * r^2
+         */
+            BigInteger randomR = new BigInteger(trustedN.bitLength() + 1, rand).mod(trustedN);   // Randomly selected r
+            int bitIndex = (int) (Math.random() * (randomBits.length()));   // Randomly selected bitIndex
+
+            System.out.println("Alice r: " + randomR.toString());
+            System.out.println("Alice bitIbdex: " + bitIndex);
+
+            BigInteger x = (((new BigInteger("-1")).pow(randomBits.get(bitIndex) ? 1 : 0))
+                    .multiply((randomR.pow(2))))
+                    .mod(trustedN);
+
+
+            System.out.println("Alice x: " + x.toString());
+
+            dos.writeUTF(x.toString());
+
+            String eBits = dis.readUTF();
+
+            System.out.println("Alice eBits: " + eBits);
+
+
+            BigInteger totalMultS = new BigInteger("1");
+            for (int i = 0; i < k; i++) {
+                totalMultS = totalMultS
+                        .multiply(randomInts.get(i).pow(eBits.charAt(i) == '1' ? 1 : 0));
+            }
+
+            BigInteger y = totalMultS.multiply(randomR.mod(trustedN)).mod(trustedN);
+
+
+            dos.writeUTF(y.toString()); // Send y
+            System.out.println("Alice y: " + y.toString());
+
+        }
+
+    }
+
     public void startCommunication() throws Exception {
 
         /*
@@ -138,89 +228,17 @@ public class AliceClient {
         /////////////////////// Key agreement ///////////////////////
         agreeAboutKey();
 
-        /////////////////////// Authorization ///////////////////////
+        /////////////////////// Identification ///////////////////////
 
-        BigInteger trustedN = new BigInteger(dis.readUTF());    // Receive n = p*q
-        int k = dis.readInt();  // Receive k
-        int t = dis.readInt();  // Receive amount of rounds t
-        System.out.println("Alice n:" +  trustedN);
-        System.out.println("Alice k:" +  k);
-
-        List<BigInteger> randomInts = new ArrayList<>();    // s1,s2...sk
-        BitSet randomBits = new BitSet(k);  // b1,b2...bk
-        List<BigInteger> listV = new ArrayList<>(); // v1,v2...vk
-
-        Random rand = new Random(); // Need for generation random ints
-
-        /*
-        Choose k positive numbers less than trustedN.
-        Choose k bits 0 or 1
-         */
-        System.out.print("Serets: ");
-        for (int i = 0; i < k; i++) {
-            randomInts.add(BigInteger.valueOf((rand.nextInt(Integer.MAX_VALUE) + 1)).mod(trustedN));
-            randomBits.set(i, rand.nextBoolean());
-
-            BigInteger minus1pow = (((new BigInteger("-1")).pow(randomBits.get(i) ? 1 : 0)).mod(trustedN));
-            BigInteger randomIntPow = (randomInts.get(i).pow(2)).modInverse(trustedN);
-            System.out.print(randomInts.get(i) + " " + randomBits.get(i) + " ");
-            listV.add((minus1pow.multiply(randomIntPow)).mod(trustedN));
-        }
-
-        System.out.println("\nAlice vi: ");
-        for (BigInteger bi:
-             listV) {
-            System.out.println(bi.toString());
-            dos.writeUTF(bi.toString());
-        }
+        identifyMyself();
 
 
         ///////////////// Rounds ////////////////////////////
 
-        /*
-        Count x value like x = (-1)^b * r^2
-         */
-        BigInteger randomR = BigInteger.valueOf((rand.nextInt(Integer.MAX_VALUE) + 1)).mod(trustedN);   // Randomly selected r
-        int bitIndex = rand.nextInt(randomBits.length());   // Randomly selected bitIndex
-
-        System.out.println("Alice r: " + randomR.toString());
-        System.out.println("Alice bitIbdex: " + bitIndex);
-
-        BigInteger minus1powMod = (((new BigInteger("-1")).pow(randomBits.get(bitIndex) ? 1 : 0)).mod(trustedN));   // (-1)^b mod n
-        BigInteger randomRpow2Mod = (randomR.pow(2)).mod(trustedN); // r^2 mod n
-
-//        BigInteger x = (minus1powMod.multiply(randomRpow2Mod)).mod(trustedN); // x value
-        BigInteger x = ((new BigInteger("-1")).pow(randomBits.get(bitIndex) ? 1 : 0).mod(trustedN)).multiply((randomR.pow(2)).mod(trustedN)).mod(trustedN);
-
-        System.out.println("Alice x: " + x.toString());
-
-        dos.writeUTF(x.toString());
-
-        String eBits = dis.readUTF();
-
-        System.out.println("Alice eBits: " + eBits);
-
-
-        BigInteger totalMult = new BigInteger("1");
-
-        for (int i = 0; i < k; i++) {
-            totalMult = totalMult
-                    .multiply(randomInts.get(i).pow(eBits.charAt(i) == '1' ? 1 : 0));
-        }
-        totalMult = totalMult.mod(trustedN).multiply(randomR.mod(trustedN)).mod(trustedN);
-        BigInteger y = totalMult;
-//        BigInteger y = (randomR.mod(trustedN).multiply(totalMult.mod(trustedN))).mod(trustedN);   // Count y(step 3 in algorithm)
-
-
-        dos.writeUTF(y.toString()); // Send y
-        System.out.println("Alice y: " + y.toString());
-
-
+        playRounds();
 
         /////////////////////// Communication ///////////////////////
-//        communicate();
-
-
+        communicate();
 
         // Close opened streams.
         dis.close();

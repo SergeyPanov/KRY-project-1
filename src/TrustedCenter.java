@@ -8,7 +8,7 @@ public class TrustedCenter {
     private BigInteger n;
 
     private int k = 3;
-    private int t = 4;
+    public static final int t = 4;
 
     public BigInteger generateN(){
         /*
@@ -27,7 +27,4 @@ public class TrustedCenter {
         return k;
     }
 
-    public int getT() {
-        return t;
-    }
 }
