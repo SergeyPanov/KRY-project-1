@@ -12,20 +12,16 @@ public class AliceClient {
     private int port = 4444;
     private String host;
     private int keySize = 512;
-    private Socket socket = null;
-    private OutputStream socketOutputStream = null;
-    private InputStream socketInputStream = null;
     private DataOutputStream dos = null;
     private DataInputStream dis = null;
-    byte[] aliceSharedSecret;
+    private byte[] aliceSharedSecret;
     private BigInteger trustedN;
     private int k;
     private int t;
 
-    List<BigInteger> randomInts = new ArrayList<>();    // s1,s2...sk
-    BitSet randomBits;  // b1,b2...bk
-    List<BigInteger> listV = new ArrayList<>(); // v1,v2...vk
-    Random rand = new Random(); // Need for generation random ints
+    private List<BigInteger> randomInts = new ArrayList<>();    // s1,s2...sk
+    private BitSet randomBits;  // b1,b2...bk
+    private Random rand = new Random(); // Need for generation random ints
     private void agreeAboutKey() throws IOException, NoSuchAlgorithmException, InvalidKeySpecException, InvalidKeyException {
 
         /*
@@ -66,7 +62,7 @@ public class AliceClient {
 
 
         // Receive bobPubKeyEnc
-        int lengthOfBobKey = -1;
+        int lengthOfBobKey;
         lengthOfBobKey = dis.readInt();   // Read length of bobPubKeyEnc
         byte[] bobPubKeyEnc = new byte[lengthOfBobKey];
         dis.readFully(bobPubKeyEnc);  // Read bobPubKeyEnc
@@ -133,7 +129,7 @@ public class AliceClient {
 
         randomInts = new ArrayList<>();    // s1,s2...sk
         randomBits = new BitSet(k);  // b1,b2...bk
-        listV = new ArrayList<>(); // v1,v2...vk
+        List<BigInteger> listV = new ArrayList<>();
 
         /*
         Choose k positive numbers less than trustedN.
@@ -214,11 +210,11 @@ public class AliceClient {
          */
 
         // Create socket for communication.
-        socket = new Socket(host, port);
+        Socket socket = new Socket(host, port);
 
         // Create input and output streams.
-        socketOutputStream = socket.getOutputStream();
-        socketInputStream = socket.getInputStream();
+        OutputStream socketOutputStream = socket.getOutputStream();
+        InputStream socketInputStream = socket.getInputStream();
 
         // Create data input and data output streams; just for convenience.
         dos = new DataOutputStream(socketOutputStream);
